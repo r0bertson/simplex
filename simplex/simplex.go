@@ -7,6 +7,7 @@ import (
 )
 
 type Simplex struct {
+	status      string
 	variables   []string
 	tableau     [][]float64
 	rowsSize    int
@@ -32,7 +33,7 @@ func (s *Simplex) PrintTableau() {
 }
 
 func (s *Simplex) IsOptimal() bool {
-	for i := 0; i < s.rowsSize; i++ {
+	for i := 0; i < s.columnsSize-1; i++ {
 		if s.tableau[0][i] < 0 {
 			return false
 		}
@@ -58,11 +59,11 @@ func (s *Simplex) FindPivotColumn() int {
 
 //FindPivotRow obtain the index of the chosen pivotRow
 func (s *Simplex) FindPivotRow(pivotColumn int) int {
-	minRatio := 9999.99
+	minRatio := 99999999.99
 	position := 1
 	for i := 1; i < s.rowsSize; i++ {
 		elementValue := s.tableau[i][pivotColumn]
-		if elementValue != 0 {
+		if elementValue > 0 || s.tableau[i][s.columnsSize-1] > 0 {
 			ratio := s.tableau[i][s.columnsSize-1] / elementValue
 			if ratio < minRatio { //Bland's rule (always choose the lower index)
 				minRatio = ratio
@@ -101,6 +102,7 @@ func (s *Simplex) getPivotColumn(pivotColumn int) []float64 {
 	return columnValues
 }
 
+//Solve loop until it find the optimal answer or fails (WHEN IT FAILS?)
 func (s *Simplex) Solve() {
 	fmt.Println("Initial Tableau: ")
 	s.PrintTableau()
@@ -115,5 +117,25 @@ func (s *Simplex) Solve() {
 		fmt.Println("Tableau after " + strconv.Itoa(iteration) + " iteration(s):")
 		s.PrintTableau()
 	}
+	s.status = "OPTIMAL"
+	if !s.isFeasible() {
+		s.status = "INFEASIBLE"
+	}
+	fmt.Println(s.status)
+}
 
+func (s *Simplex) getRanges() {
+	//TODO:  b = S∗∆b + b ∗ ≥ 0
+
+}
+
+//
+
+func (s *Simplex) isFeasible() bool {
+	for i := 1; i < s.rowsSize; i++ {
+		if s.tableau[i][s.columnsSize-1] < 0 {
+			return false
+		}
+	}
+	return true
 }
