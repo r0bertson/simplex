@@ -4,24 +4,125 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+
+	ltx "github.com/r0bertson/ltx-parser"
 )
 
+// EPSILON value of the error while comparing two floats
+var EPSILON = 0.000000001
+var bigM = 1000000.00
+
 type Simplex struct {
+	lp          *ltx.LinearProblem
 	status      string
 	variables   []string
+	base        []int
 	tableau     [][]float64
 	rowsSize    int
 	columnsSize int
 }
 
-func (s *Simplex) Build(problem [][]float64, numberOfRows, numberOfColumns int) {
+func (s *Simplex) BuildImportedProblem(lp *ltx.LinearProblem) {
+	s.lp = lp
+	s.rowsSize = len(lp.Constraints) + 1
+	s.columnsSize = s.getColumnsLength()
+
+	s.tableau = make([][]float64, s.rowsSize) //initializing tableau's rows
+	for i := 0; i < s.rowsSize; i++ {
+		//initializing tableau's columns
+		s.tableau[i] = make([]float64, s.columnsSize)
+	}
+
+	s.PrintTableau()
+	// Filling variables coefficients of the OF into tableau and storing its name into variable array
+
+	for i, v := range lp.ObjectiveFunction.Variables {
+		s.variables = append(s.variables, v.Name)
+		s.tableau[0][i] = v.Coefficient * -1.0
+	}
+	// Filling variables coefficients of constraints adding slack/surplus
+	for i, constraint := range lp.Constraints {
+
+		for j := 0; j < len(constraint.LH); j++ {
+			col := s.findVariableColumn(constraint.LH[j].Name)
+			s.tableau[i+1][col] = constraint.LH[j].Coefficient
+
+		}
+		removeFromOF := false
+		remove := -1
+		//add
+		switch constraint.Operator {
+		case "<=":
+			slackName := "S" + strconv.Itoa(i+1) //creating name
+			s.variables = append(s.variables, slackName)
+			s.base = append(s.base, len(s.variables)-1)
+			s.tableau[i+1][s.findVariableColumn(slackName)] = 1
+		case ">=":
+			/* STEPS:
+			1. Adds a surplus variable (negative) and artificial variable (A.V.)
+			2. Place A.V. with a penalty on the OF
+			3. Remove A.V. from the OF
+			*/
+			slackName := "S" + strconv.Itoa(i+1) //creating name
+			artificialName := "A" + strconv.Itoa(i+1)
+
+			s.variables = append(s.variables, slackName)
+			s.variables = append(s.variables, artificialName)
+			s.base = append(s.base, len(s.variables)-1)
+
+			slackColumn := s.findVariableColumn(slackName)
+			s.tableau[i+1][slackColumn] = -1
+			s.tableau[0][slackColumn] = bigM
+
+			artificialColumn := s.findVariableColumn(artificialName)
+			s.tableau[i+1][artificialColumn] = 1
+			s.tableau[0][artificialColumn] = bigM
+
+			removeFromOF = true
+			remove = artificialColumn
+
+		case "=":
+			/* STEPS:
+			1. Adds artificial variable (A.V.)
+			2. Place A.V. with a penalty on the OF
+			3. Remove A.V. from the OF
+			*/
+			artificialName := "A" + strconv.Itoa(i+1)
+
+			s.variables = append(s.variables, artificialName)
+			s.base = append(s.base, len(s.variables)-1)
+
+			artificialColumn := s.findVariableColumn(artificialName)
+			s.tableau[i+1][artificialColumn] = 1
+			s.tableau[0][artificialColumn] = bigM
+
+			removeFromOF = true
+			remove = artificialColumn
+		}
+		//place right hand side of constraint on tableau
+		s.tableau[i+1][s.columnsSize-1] = constraint.RH
+
+		if removeFromOF {
+			//TODO: Remove A.V. from the OF
+		}
+	}
+	fmt.Println(s.variables)
+	s.PrintTableau()
+}
+
+func (s *Simplex) BuildStandardizedProblem(problem [][]float64, numberOfRows, numberOfColumns int) {
 	s.rowsSize = numberOfRows
 	s.columnsSize = numberOfColumns
 	s.tableau = problem
 }
 
 func (s *Simplex) PrintTableau() {
-	//TODO: ADD HEADER
+	//PrintingHeader
+	for i := 0; i < len(s.variables); i++ {
+		fmt.Print(fmt.Sprintf("%s        ", s.variables[i]) + "\t")
+	}
+
+	fmt.Println()
 	for i := 0; i < s.rowsSize; i++ {
 		for j := 0; j < s.columnsSize; j++ {
 			element := fmt.Sprintf("%f", s.tableau[i][j]) + "\t"
@@ -86,7 +187,7 @@ func (s *Simplex) UpdateTableau(pivotRow, pivotColumn int) {
 
 	for i := 0; i < s.rowsSize; i++ {
 		//skip pivotRow and when element is already 0
-		if i != pivotRow && s.tableau[i][pivotColumn] != 0.0 {
+		if i != pivotRow && !equals(s.tableau[i][pivotColumn], 0.0) {
 			for j := 0; j < s.columnsSize; j++ {
 				s.tableau[i][j] = s.tableau[i][j] - (s.tableau[pivotRow][j] * pivotColumnValues[i])
 			}
@@ -138,4 +239,40 @@ func (s *Simplex) isFeasible() bool {
 		}
 	}
 	return true
+}
+
+func equals(a, b float64) bool {
+	return math.Abs(a-b) < EPSILON
+}
+
+func getCoefficient(name string, c ltx.Constraint) float64 {
+	for _, v := range c.LH {
+		if v.Name == name {
+			return v.Coefficient
+		}
+	}
+	return 0.0
+}
+
+func (s *Simplex) findVariableColumn(name string) int {
+	for index, value := range s.variables {
+		if value == name {
+			return index
+		}
+	}
+	return -1
+}
+
+func (s *Simplex) getColumnsLength() int {
+	count := 1
+	count += len(s.lp.ObjectiveFunction.Variables) //one for each variable
+	for _, c := range s.lp.Constraints {
+		switch c.Operator {
+		case "<=", "=":
+			count++ //one artificial
+		case ">=":
+			count += 2 //one slack, one artificial
+		}
+	}
+	return count
 }
