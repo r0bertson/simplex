@@ -55,8 +55,9 @@ func main() {
 				SUBJECT TO
 					X1 <= 4
 					2 X2 <= 12
-					3 X1 + 2 X2 <= 18
+					3 X1 + 2 X2 = 18
 				END`
+
 	parser := ltx.NewParser(strings.NewReader(problem))
 	lp, _ := parser.Parse()
 

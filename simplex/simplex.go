@@ -40,7 +40,12 @@ func (s *Simplex) BuildImportedProblem(lp *ltx.LinearProblem) {
 		s.variables = append(s.variables, v.Name)
 		s.tableau[0][i] = v.Coefficient * -1.0
 	}
-	// Filling variables coefficients of constraints adding slack/surplus
+
+	//for naming purpouses
+	slackCount := 0
+	artificialCount := 0
+
+	// Filling coefficients of constraints adding slack/artificial variables
 	for i, constraint := range lp.Constraints {
 
 		for j := 0; j < len(constraint.LH); j++ {
@@ -48,12 +53,14 @@ func (s *Simplex) BuildImportedProblem(lp *ltx.LinearProblem) {
 			s.tableau[i+1][col] = constraint.LH[j].Coefficient
 
 		}
-		removeFromOF := false
-		remove := -1
-		//add
+
+		//place right hand side of constraint on tableau
+		s.tableau[i+1][s.columnsSize-1] = constraint.RH
+
 		switch constraint.Operator {
 		case "<=":
-			slackName := "S" + strconv.Itoa(i+1) //creating name
+			slackCount++
+			slackName := "S" + strconv.Itoa(slackCount) //creating name
 			s.variables = append(s.variables, slackName)
 			s.base = append(s.base, len(s.variables)-1)
 			s.tableau[i+1][s.findVariableColumn(slackName)] = 1
@@ -63,23 +70,24 @@ func (s *Simplex) BuildImportedProblem(lp *ltx.LinearProblem) {
 			2. Place A.V. with a penalty on the OF
 			3. Remove A.V. from the OF
 			*/
-			slackName := "S" + strconv.Itoa(i+1) //creating name
-			artificialName := "A" + strconv.Itoa(i+1)
-
+			slackCount++
+			artificialCount++
+			slackName := "S" + strconv.Itoa(slackCount) //creating name
+			artificialName := "A" + strconv.Itoa(artificialCount)
+			// STEP 1
 			s.variables = append(s.variables, slackName)
 			s.variables = append(s.variables, artificialName)
 			s.base = append(s.base, len(s.variables)-1)
 
 			slackColumn := s.findVariableColumn(slackName)
 			s.tableau[i+1][slackColumn] = -1
-			s.tableau[0][slackColumn] = bigM
+			s.tableau[0][slackColumn] = bigM // STEP 2
 
 			artificialColumn := s.findVariableColumn(artificialName)
 			s.tableau[i+1][artificialColumn] = 1
 			s.tableau[0][artificialColumn] = bigM
 
-			removeFromOF = true
-			remove = artificialColumn
+			s.removeVBfromOF(i+1, artificialColumn) //STEP 3
 
 		case "=":
 			/* STEPS:
@@ -87,24 +95,21 @@ func (s *Simplex) BuildImportedProblem(lp *ltx.LinearProblem) {
 			2. Place A.V. with a penalty on the OF
 			3. Remove A.V. from the OF
 			*/
-			artificialName := "A" + strconv.Itoa(i+1)
-
+			artificialCount++
+			artificialName := "A" + strconv.Itoa(artificialCount)
+			//STEP 1
 			s.variables = append(s.variables, artificialName)
 			s.base = append(s.base, len(s.variables)-1)
 
 			artificialColumn := s.findVariableColumn(artificialName)
 			s.tableau[i+1][artificialColumn] = 1
-			s.tableau[0][artificialColumn] = bigM
+			s.tableau[0][artificialColumn] = bigM //STEP 2
 
-			removeFromOF = true
-			remove = artificialColumn
+			s.removeVBfromOF(i+1, artificialColumn) //STEP 3
 		}
 		//place right hand side of constraint on tableau
-		s.tableau[i+1][s.columnsSize-1] = constraint.RH
+		//s.tableau[i+1][s.columnsSize-1] = constraint.RH
 
-		if removeFromOF {
-			//TODO: Remove A.V. from the OF
-		}
 	}
 	fmt.Println(s.variables)
 	s.PrintTableau()
@@ -173,6 +178,16 @@ func (s *Simplex) FindPivotRow(pivotColumn int) int {
 		}
 	}
 	return position
+}
+
+func (s *Simplex) removeVBfromOF(pivotRow, pivotColumn int) {
+
+	pivotElement := s.tableau[0][pivotColumn]
+	fmt.Println(fmt.Sprintf("%f", pivotElement))
+
+	for j := 0; j < s.columnsSize; j++ {
+		s.tableau[0][j] = s.tableau[0][j] - (s.tableau[pivotRow][j] * pivotElement)
+	}
 }
 
 //UpdateTableau performs algebraic operations to swap variables at the base
