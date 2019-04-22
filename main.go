@@ -51,13 +51,20 @@ func main() {
 	// simplex2 := s.Simplex{}
 	// simplex2.Build(problem2, len(problem2), len(problem2[0]))
 	// simplex2.Solve()
-	problem := `MAX 3 X1 + 5 X2
+	problem := `MIN 0.4 X1 + 0.5 X2
 				SUBJECT TO
-					X1 <= 4
-					2 X2 <= 12
-					3 X1 + 2 X2 = 18
+					0.3 X1 + 0.1 X2 <= 2.7
+					0.5 X1 + 0.5 X2 = 6
+					0.6 X1 + 0.4 X2 >= 6
 				END`
-
+	/*
+		problem2:= `MAX 3 X1 + 5 X2
+		SUBJECT TO
+			X1 <= 4
+			2 X2 <= 12
+			3 X1 + 2 X2 = 18
+		END`
+	*/
 	parser := ltx.NewParser(strings.NewReader(problem))
 	lp, _ := parser.Parse()
 
