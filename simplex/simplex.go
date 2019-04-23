@@ -131,7 +131,43 @@ func (s *Simplex) BuildStandardizedProblem(problem [][]float64, numberOfRows, nu
 	s.Tableau = problem
 }
 
+func (s *Simplex) BuildDualProblem() [][]float64 {
+	dualRow := s.ColumnsSize
+	dualColumn := s.RowsSize
+	dualTableau := make([][]float64, dualRow)
+	for i := range dualTableau {
+		dualTableau[i] = make([]float64, dualColumn)
+	}
+	for i := 0; i < dualRow; i++ {
+		for j := 0; j < dualColumn; j++ {
+			dualTableau[i][j] = s.Tableau[j][dualRow-i-1]
+		}
+	}
+	return dualTableau
+}
+
 // PrintTableau   prints the tableau on screen
+func (s *Simplex) PrintTableauDual() {
+
+	dualTableau := s.BuildDualProblem()
+	//printing header
+
+	for i := 0; i < len(dualTableau[0])-1; i++ {
+		fmt.Print(fmt.Sprintf("%s        ", "Y"+strconv.Itoa(i)) + "\t") //TODO: NAME HEADER
+	}
+	fmt.Println()
+
+	for i := 0; i < len(dualTableau); i++ {
+		//fmt.Print(fmt.Sprintf("%s", s.Base[i]) + "\t")
+		for j := 0; j < len(dualTableau[0]); j++ {
+			element := fmt.Sprintf("%f", dualTableau[i][j]) + "\t"
+			fmt.Print(element)
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}
+
 func (s *Simplex) PrintTableau() {
 	//printing header
 	fmt.Print(fmt.Sprintf("%s", "B.V.") + "\t")
@@ -277,11 +313,6 @@ func (s *Simplex) SolveQuietly() {
 
 }
 
-func (s *Simplex) getRanges() {
-	//TODO:  b = S∗∆b + b ∗ ≥ 0
-
-}
-
 // isFeasible returns true if all coefficients on the last column of Tableau are non-negative
 func (s *Simplex) isFeasible() bool {
 	for i := 1; i < s.RowsSize; i++ {
@@ -343,4 +374,132 @@ func (s *Simplex) getOFCoefficient() float64 {
 		return -1.0
 	}
 	return 1.0
+}
+
+// GetRanges()
+func (s *Simplex) GetRanges() {
+	/*  b = S∗∆b + b∗ ≥ 0
+	MEANING: S* : Non-basic variables of final tableau
+			 b* : RH of final tableau
+	*/
+	if s.Status != "OPTIMAL" {
+		return
+	}
+	nonBasicVariables := s.getSlackVariables()
+
+	var S [][]float64
+	for _, nbv := range nonBasicVariables {
+		S = append(S, s.getColumn(nbv)[1:])
+	}
+
+	var bAsterisk [][]float64
+	bAsterisk = append(bAsterisk, s.getColumn(s.ColumnsSize - 1)[1:]) //ignoring Z row
+	bAsterisk = transpose(bAsterisk)                                  //get column returns an array 1xm, transpose will return a matrix mx1
+
+	var deltas [][]float64
+	var operators [][]string
+	for j := 0; j < len(S); j++ {
+		var deltaB []float64
+		var deltaBOperator []string
+		for i := 0; i < len(S[0]); i++ {
+
+			value := -bAsterisk[i][0] * 1 / S[j][i]
+			if S[j][i] < 0.0 {
+				deltaBOperator = append(deltaBOperator, "<=")
+			} else {
+				deltaBOperator = append(deltaBOperator, ">=")
+			}
+			deltaB = append(deltaB, value)
+		}
+		deltas = append(deltas, deltaB)
+		operators = append(operators, deltaBOperator)
+	}
+
+	header := "ROW" + "\t" + "A.INC" + "\t" + "A.DEC"
+	fmt.Println(header)
+	for i := 0; i < len(deltas); i++ {
+		var allowableIncrease, allowableDecrease float64
+		allowableIncrease = math.Inf(1)
+		allowableDecrease = math.Inf(-1)
+		for j := 0; j < len(deltas[0]); j++ {
+			temp := deltas[i][j]
+			if operators[i][j] == "<=" {
+				if temp < allowableIncrease {
+					allowableIncrease = temp
+				}
+			} else {
+				if temp > allowableDecrease {
+					allowableDecrease = temp
+				}
+			}
+
+		}
+		line := fmt.Sprintf("%d", i+1) + "\t" + fmt.Sprintf("%f", allowableIncrease) + "\t" + fmt.Sprintf("%f", -1*allowableDecrease)
+		fmt.Println(line)
+	}
+
+}
+func multiplySlices(A, B [][]float64) [][]float64 {
+	//check if number of columns on A is the same as the number of rows on B
+	if len(A[0]) != len(B) {
+		return nil
+	}
+
+	out := make([][]float64, len(A))
+	for i := 0; i < len(A); i++ {
+		out[i] = make([]float64, len(B[0]))
+		for j := 0; j < len(B[0]); j++ {
+			for k := 0; k < len(B); k++ {
+				out[i][j] += A[i][k] * B[k][j]
+			}
+		}
+	}
+	return out
+}
+
+func addSlices(A, B [][]float64) [][]float64 {
+	//check if number of rows and columns on A is the same as on B
+	if len(A[0]) != len(B[0]) || len(A) != len(B) {
+		return nil
+	}
+
+	for i := 0; i < len(A); i++ {
+		for j := 0; j < len(A[0]); j++ {
+			A[i][j] += B[i][j]
+		}
+	}
+	return A
+
+}
+
+func (s *Simplex) getSlackVariables() []int {
+	var slackVariables []int
+	for i, v := range s.Variables {
+		isDecisionVariable := false
+		//checks if variables are present in OF
+		for j := 0; j < len(s.LP.ObjectiveFunction.Variables) && !isDecisionVariable; j++ {
+			if s.LP.ObjectiveFunction.Variables[j].Name == v {
+				isDecisionVariable = true
+			}
+		}
+		if !isDecisionVariable {
+			slackVariables = append(slackVariables, i)
+		}
+	}
+	return slackVariables
+}
+
+func transpose(slice [][]float64) [][]float64 {
+	row := len(slice[0])
+	col := len(slice)
+	result := make([][]float64, row)
+	for i := range result {
+		result[i] = make([]float64, col)
+	}
+	for i := 0; i < row; i++ {
+		for j := 0; j < col; j++ {
+			result[i][j] = slice[j][i]
+		}
+	}
+	return result
 }
