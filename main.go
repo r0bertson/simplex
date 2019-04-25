@@ -67,12 +67,19 @@ func main() {
 			X1 + 2X2 + X3 <= 8
 			-X1 + X2 -2X3 <= 4
 		END`*/
+	// PADRAO
+	/*problem := `MAX 3 X1 + 5 X2
+	SUBJECT TO
+		X1 <= 4
+		2 X2 <= 12
+		3 X1 + 2 X2 = 18
+	END`*/
 
-	problem := `MAX 3 X1 + 5 X2
+	//UNBOUND
+	problem := `MAX 2 X1 + X2
 		SUBJECT TO
-			X1 <= 4
-			2 X2 <= 12
-			3 X1 + 2 X2 = 18
+			X1 - X2 <= 10
+			2 X1  - X2 <= 40
 		END`
 
 	parser := ltx.NewParser(strings.NewReader(problem))
@@ -81,10 +88,10 @@ func main() {
 	fmt.Println(lp.Constraints)
 	simplex := s.Simplex{}
 	simplex.BuildImportedProblem(lp)
-	simplex.SolveQuietly()
-	simplex.PrintTableau()
+	simplex.Solve()
+	//simplex.PrintTableau()
 	//simplex.PrintTableauDual()
-	simplex.GetRanges()
+	//simplex.GetRanges()
 	//simplex.BuildDualProblem()
 	//simplex.PrintTableauDual()
 

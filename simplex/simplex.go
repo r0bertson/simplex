@@ -131,43 +131,6 @@ func (s *Simplex) BuildStandardizedProblem(problem [][]float64, numberOfRows, nu
 	s.Tableau = problem
 }
 
-func (s *Simplex) BuildDualProblem() [][]float64 {
-	dualRow := s.ColumnsSize
-	dualColumn := s.RowsSize
-	dualTableau := make([][]float64, dualRow)
-	for i := range dualTableau {
-		dualTableau[i] = make([]float64, dualColumn)
-	}
-	for i := 0; i < dualRow; i++ {
-		for j := 0; j < dualColumn; j++ {
-			dualTableau[i][j] = s.Tableau[j][dualRow-i-1]
-		}
-	}
-	return dualTableau
-}
-
-// PrintTableau   prints the tableau on screen
-func (s *Simplex) PrintTableauDual() {
-
-	dualTableau := s.BuildDualProblem()
-	//printing header
-
-	for i := 0; i < len(dualTableau[0])-1; i++ {
-		fmt.Print(fmt.Sprintf("%s        ", "Y"+strconv.Itoa(i)) + "\t") //TODO: NAME HEADER
-	}
-	fmt.Println()
-
-	for i := 0; i < len(dualTableau); i++ {
-		//fmt.Print(fmt.Sprintf("%s", s.Base[i]) + "\t")
-		for j := 0; j < len(dualTableau[0]); j++ {
-			element := fmt.Sprintf("%f", dualTableau[i][j]) + "\t"
-			fmt.Print(element)
-		}
-		fmt.Println()
-	}
-	fmt.Println()
-}
-
 func (s *Simplex) PrintTableau() {
 	//printing header
 	fmt.Print(fmt.Sprintf("%s", "B.V.") + "\t")
@@ -194,6 +157,7 @@ func (s *Simplex) IsOptimal() bool {
 			return false
 		}
 	}
+	s.Status = "OPTIMAL"
 	return true
 }
 
@@ -217,7 +181,7 @@ func (s *Simplex) FindPivotColumn() int {
 by applying the minimum ratio test */
 func (s *Simplex) GetMinRatioRow(pivotColumn int) int {
 	minRatio := maxRatio
-	position := 1
+	position := -1
 	for i := 1; i < s.RowsSize; i++ {
 		elementValue := s.Tableau[i][pivotColumn]
 		if elementValue > 0 && s.Tableau[i][s.ColumnsSize-1] > 0 {
@@ -279,6 +243,11 @@ func (s *Simplex) Solve() {
 		pivotColumn := s.FindPivotColumn()
 		fmt.Println("Selected pivot column index: " + strconv.Itoa(pivotColumn))
 		pivotRow := s.GetMinRatioRow(pivotColumn)
+		if pivotRow == -1 {
+			s.Status = "UNBOUND"
+			fmt.Println("Solution is unbound due to negative values on variable: " + s.Variables[pivotColumn])
+			break
+		}
 		fmt.Println("Selected pivot row index: " + strconv.Itoa(pivotRow))
 
 		//swap variables on the base and update Basic Variables column (pivotColumn enters, pivotRow leaves)
@@ -288,10 +257,11 @@ func (s *Simplex) Solve() {
 		fmt.Println("Tableau after " + strconv.Itoa(iteration) + " iteration(s):")
 		s.PrintTableau()
 	}
-	s.Status = "OPTIMAL"
-	if !s.isFeasible() {
+
+	if !s.isFeasible() && s.Status != "UNBOUND" {
 		s.Status = "INFEASIBLE"
 	}
+
 	fmt.Println(s.Status)
 }
 
@@ -301,13 +271,17 @@ func (s *Simplex) SolveQuietly() {
 		s.NumIterations++
 		pivotColumn := s.FindPivotColumn()
 		pivotRow := s.GetMinRatioRow(pivotColumn)
+		if pivotRow == -1 {
+			s.Status = "UNBOUND"
+			fmt.Println("Solution is unbound due to negative values on variable: " + s.Variables[pivotColumn])
+			break
+		}
 		//swap variables on the base and update Basic Variables column (pivotColumn enters, pivotRow leaves)
 		s.UpdateTableau(pivotRow, pivotColumn)      //swap variables
 		s.Base[pivotRow] = s.Variables[pivotColumn] //update base
 
 	}
-	s.Status = "OPTIMAL"
-	if !s.isFeasible() {
+	if !s.isFeasible() && s.Status != "UNBOUND" {
 		s.Status = "INFEASIBLE"
 	}
 
@@ -437,8 +411,8 @@ func (s *Simplex) GetRanges() {
 		line := fmt.Sprintf("%d", i+1) + "\t" + fmt.Sprintf("%f", allowableIncrease) + "\t" + fmt.Sprintf("%f", -1*allowableDecrease)
 		fmt.Println(line)
 	}
-
 }
+
 func multiplySlices(A, B [][]float64) [][]float64 {
 	//check if number of columns on A is the same as the number of rows on B
 	if len(A[0]) != len(B) {
