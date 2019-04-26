@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 
 	ltx "github.com/r0bertson/ltx-parser"
 )
@@ -392,7 +393,7 @@ func (s *Simplex) GetRanges() {
 		operators = append(operators, deltaBOperator)
 	}
 
-	header := "ROW" + "\t" + "A.INC" + "\t" + "A.DEC"
+	header := "TODO: INVERT INCREASE DECREASE IF MIN \n " + "ROW" + "\t" + "A.INC" + "\t" + "A.DEC"
 	fmt.Println(header)
 	for i := 0; i < len(deltas); i++ {
 		var allowableIncrease, allowableDecrease float64
@@ -462,7 +463,7 @@ func (s *Simplex) getSlackVariables() []int {
 				isDecisionVariable = true
 			}
 		}
-		if !isDecisionVariable {
+		if !isDecisionVariable && !strings.HasPrefix(v, "A") {
 			slackVariables = append(slackVariables, i)
 		}
 	}

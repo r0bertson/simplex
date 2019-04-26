@@ -68,11 +68,18 @@ func main() {
 			-X1 + X2 -2X3 <= 4
 		END`*/
 	// PADRAO
-	problem := `MAX 3 X1 + 5 X2
+	/*problem := `MAX 3 X1 + 5 X2
 	SUBJECT TO
 		X1 <= 4
 		2 X2 <= 12
 		3 X1 + 2 X2 <= 18
+	END`*/
+	//DUAL
+	problem := `MIN 4Y1 + 12 Y2 + 18 Y3
+	ST
+		1 Y1 + 0 Y2 + 3 Y3 >= 3
+		0 Y1 + 2 Y2 + 2 Y3 >= 5
+
 	END`
 
 	//UNBOUND
