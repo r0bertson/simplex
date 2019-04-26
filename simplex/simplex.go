@@ -15,14 +15,15 @@ var maxRatio = 99999999.99
 
 // Simplex holds the information of a Linear Problem an the state of the solution process
 type Simplex struct {
-	LP            *ltx.LinearProblem
-	Status        string
-	Variables     []string
-	Base          []string
-	Tableau       [][]float64
-	RowsSize      int
-	ColumnsSize   int
-	NumIterations int
+	LP             *ltx.LinearProblem
+	Status         string
+	Variables      []string
+	Base           []string
+	InitialTableau [][]float64
+	Tableau        [][]float64
+	RowsSize       int
+	ColumnsSize    int
+	NumIterations  int
 }
 
 // BuildImportedProblem builds the Tableau based on a LinearProblem exported by the ltx-parser
@@ -121,6 +122,7 @@ func (s *Simplex) BuildImportedProblem(lp *ltx.LinearProblem) {
 		}
 
 	}
+	s.InitialTableau = duplicateTableau(s.Tableau)
 }
 
 /*BuildStandardizedProblem accepts a standardized Tableau without building it from the LP.
@@ -350,10 +352,11 @@ func (s *Simplex) getOFCoefficient() float64 {
 	return 1.0
 }
 
-// GetRanges()
+/*GetRanges prints the ranges which we can increase of decrease the RH side of a contraint without changing
+the values of the found optimal solution */
 func (s *Simplex) GetRanges() {
 	/*  b = S∗∆b + b∗ ≥ 0
-	MEANING: S* : Non-basic variables of final tableau
+	MEANING: S* : Slacks/artificial variables columns of final tableau
 			 b* : RH of final tableau
 	*/
 	if s.Status != "OPTIMAL" {
@@ -413,6 +416,7 @@ func (s *Simplex) GetRanges() {
 	}
 }
 
+// multiplySlices performs multiplication between two slices  if the number of Columns in A is the same as numbers of rows in B (Amxn = Bnxp)
 func multiplySlices(A, B [][]float64) [][]float64 {
 	//check if number of columns on A is the same as the number of rows on B
 	if len(A[0]) != len(B) {
@@ -431,6 +435,7 @@ func multiplySlices(A, B [][]float64) [][]float64 {
 	return out
 }
 
+// addSlices performs addition operation between two slices with equal number of rows and columns ( Amxn = Bmxn)
 func addSlices(A, B [][]float64) [][]float64 {
 	//check if number of rows and columns on A is the same as on B
 	if len(A[0]) != len(B[0]) || len(A) != len(B) {
@@ -446,6 +451,7 @@ func addSlices(A, B [][]float64) [][]float64 {
 
 }
 
+//getSlackVariables returns every variable index that is not present on original OF
 func (s *Simplex) getSlackVariables() []int {
 	var slackVariables []int
 	for i, v := range s.Variables {
@@ -463,6 +469,7 @@ func (s *Simplex) getSlackVariables() []int {
 	return slackVariables
 }
 
+// transpose returns the T matrix of a slice
 func transpose(slice [][]float64) [][]float64 {
 	row := len(slice[0])
 	col := len(slice)
@@ -476,4 +483,17 @@ func transpose(slice [][]float64) [][]float64 {
 		}
 	}
 	return result
+}
+
+/*GetShadowPrices returns the the changes in the optimal values of the objective function
+per unit increase in the righthand-side value of a certain constraint. It is the value on the
+final tableau of the slack variable of a specif constraint.*/
+func (s Simplex) GetShadowPrices() {
+	fmt.Println("SHADOW PRICES:")
+	counter := 0
+	for j := len(s.LP.ObjectiveFunction.Variables); j < s.ColumnsSize-1; j++ {
+		counter++
+		line := "Constraint " + strconv.Itoa(counter) + ": " + fmt.Sprintf("%f", s.Tableau[0][j])
+		fmt.Println(line)
+	}
 }

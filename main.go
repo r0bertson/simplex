@@ -68,20 +68,25 @@ func main() {
 			-X1 + X2 -2X3 <= 4
 		END`*/
 	// PADRAO
-	/*problem := `MAX 3 X1 + 5 X2
+	problem := `MAX 3 X1 + 5 X2
 	SUBJECT TO
 		X1 <= 4
 		2 X2 <= 12
-		3 X1 + 2 X2 = 18
-	END`*/
+		3 X1 + 2 X2 <= 18
+	END`
 
 	//UNBOUND
-	problem := `MAX 2 X1 + X2
-		SUBJECT TO
-			X1 - X2 <= 10
-			2 X1  - X2 <= 40
-		END`
-
+	/*problem := `MAX 2 X1 + X2
+	SUBJECT TO
+		X1 - X2 <= 10
+		2 X1  - X2 <= 40
+	END`*/
+	/*problem := `MAX 5 X1 + 4.5 X2 + 5 X3
+	SUBJECT TO
+		6X1 + 5X2 + 8X3 <= 60
+		10X1 + 20X2 + 10X3 <= 150
+		X1 <= 8
+	END`*/
 	parser := ltx.NewParser(strings.NewReader(problem))
 	lp, _ := parser.Parse()
 
@@ -91,7 +96,10 @@ func main() {
 	simplex.Solve()
 	//simplex.PrintTableau()
 	//simplex.PrintTableauDual()
-	//simplex.GetRanges()
+	simplex.GetRanges()
+	simplex.GetShadowPrices()
+	//simplex.GetNBVranges()
+
 	//simplex.BuildDualProblem()
 	//simplex.PrintTableauDual()
 
